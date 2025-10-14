@@ -293,6 +293,7 @@ Créez `.git/hooks/commit-msg` :
 commit_msg_file=$1
 commit_msg=$(cat "$commit_msg_file")
 
+
 # Vérifier le format [ISSUE-ID]
 if ! echo "$commit_msg" | grep -qE '^\[MTE-[0-9]+\]'; then
     echo "❌ Erreur : Le message de commit doit commencer par [MTE-XXX]"

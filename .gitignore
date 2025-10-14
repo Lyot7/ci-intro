@@ -1,12 +1,10 @@
 # Node.js
 mtech-node/node_modules/
 mtech-node/coverage/
-mtech-node/package-lock.json
 
 # PHP
 mtech-php/vendor/
 mtech-php/coverage/
-mtech-php/composer.lock
 
 # IDE
 .DS_Store

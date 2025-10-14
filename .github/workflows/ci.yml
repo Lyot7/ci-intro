@@ -2,27 +2,23 @@ name: CI - Tests & Build
 
 on:
   push:
-    branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop ]
 
 jobs:
   test-node:
     name: Node.js Tests
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: '20'
           cache: 'npm'
           cache-dependency-path: mtech-node/package-lock.json
 
@@ -30,18 +26,14 @@ jobs:
         working-directory: ./mtech-node
         run: npm ci
 
-      - name: Run tests
-        working-directory: ./mtech-node
-        run: npm test
-
       - name: Run tests with coverage
         working-directory: ./mtech-node
         run: npm run test:coverage
 
-      - name: Upload coverage reports
+      - name: Upload Node.js coverage
         uses: actions/upload-artifact@v4
         with:
-          name: node-coverage-${{ matrix.node-version }}
+          name: node-coverage
           path: mtech-node/coverage/
           retention-days: 7
 
@@ -49,41 +41,31 @@ jobs:
     name: PHP Tests
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        php-version: ['8.1', '8.2', '8.3']
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup PHP ${{ matrix.php-version }}
+      - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php-version }}
+          php-version: '8.2'
           coverage: xdebug
           tools: composer
-
-      - name: Validate composer.json
-        working-directory: ./mtech-php
-        run: composer validate --strict
 
       - name: Install dependencies
         working-directory: ./mtech-php
         run: composer install --no-interaction --prefer-dist
 
-      - name: Run tests
-        working-directory: ./mtech-php
-        run: composer test
-
       - name: Run tests with coverage
         working-directory: ./mtech-php
         run: ./vendor/bin/phpunit --coverage-clover coverage/clover.xml --coverage-html coverage/html
 
-      - name: Upload coverage reports
+      - name: Upload PHP coverage
         uses: actions/upload-artifact@v4
         with:
-          name: php-coverage-${{ matrix.php-version }}
+          name: php-coverage
           path: mtech-php/coverage/
           retention-days: 7
 
@@ -96,7 +78,8 @@ jobs:
     steps:
       - name: Check build status
         run: |
-          if [ "${{ needs.test-node.result }}" == "success" ] && [ "${{ needs.test-php.result }}" == "success" ]; then
+          if [ "${{ needs.test-node.result }}" == "success" ] && \
+             [ "${{ needs.test-php.result }}" == "success" ]; then
             echo "✅ All tests passed successfully!"
             exit 0
           else

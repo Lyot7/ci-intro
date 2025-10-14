@@ -57,7 +57,7 @@ composer test           # Lancer les tests
 Consultez le fichier **Claude.md** pour le guide complet de configuration :
 - TeamCity (builds automatisés)
 - SonarQube (analyse de qualité du code)
-- YouTrack (gestion des tickets)
+- YouTrack (gestion des tickets) // test bon
 - Discord (notifications)
 - GitHub (checks et branch protection)
 

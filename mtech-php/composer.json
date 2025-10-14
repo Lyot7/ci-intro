@@ -1,0 +1,22 @@
+{
+  "name": "mtech/mtech",
+  "description": "Projet de d\u00e9monstration CI/CD en PHP avec PHPUnit",
+  "type": "project",
+  "require": {},
+  "require-dev": {
+    "phpunit/phpunit": "^9.6"
+  },
+  "autoload": {
+    "psr-4": {
+      "Mtech\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Mtech\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit"
+  }
+}

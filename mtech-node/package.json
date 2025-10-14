@@ -1,0 +1,14 @@
+{
+  "name": "mtech",
+  "version": "1.0.0",
+  "description": "Projet de démonstration CI/CD avec YouTrack et TeamCity",
+  "main": "app.js",
+  "scripts": {
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

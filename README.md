@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CI/CD Introduction - Projet Multi-langages
 
-## Getting Started
+Projet d'atelier pratique pour apprendre les concepts de CI/CD avec TeamCity, YouTrack, SonarQube et GitHub.
 
-First, run the development server:
+## Structure du Projet
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+ci-intro/
+├── mtech-node/          # Projet Node.js avec Jest
+│   ├── app.js           # Fonction addition
+│   ├── test/            # Tests Jest
+│   ├── package.json     # Configuration npm
+│   └── jest.config.js   # Configuration Jest avec couverture
+│
+├── mtech-php/           # Projet PHP avec PHPUnit
+│   ├── src/             # Code source PHP
+│   ├── tests/           # Tests PHPUnit
+│   ├── composer.json    # Configuration Composer
+│   └── phpunit.xml      # Configuration PHPUnit avec couverture
+│
+├── sonar-project.properties  # Configuration SonarQube multi-module
+├── Claude.md                 # Guide complet de configuration CI/CD
+├── .gitignore                # Exclusions Git
+└── README.md                 # Ce fichier
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Démarrage Rapide
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Projet Node.js (mtech-node)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cd mtech-node
+npm install
+npm test                # Lancer les tests
+npm run test:coverage   # Tests avec couverture
+```
 
-## Learn More
+### Projet PHP (mtech-php)
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cd mtech-php
+composer install
+composer test           # Lancer les tests
+./vendor/bin/phpunit --coverage-html coverage/html  # Tests avec couverture HTML
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Activité "Erreur et Correction"
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Décommentez le test erroné dans `mtech-node/test/app.test.js` ou `mtech-php/tests/CalculatorTest.php`
+2. Lancez les tests → un test échouera
+3. Corrigez la valeur attendue dans le test
+4. Committez avec un message lié à YouTrack : `PICT-XXX Correction du test négatifs #Fixed`
+5. Poussez vers GitHub et observez le pipeline CI/CD
 
-## Deploy on Vercel
+## Configuration CI/CD
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Consultez le fichier **Claude.md** pour le guide complet de configuration :
+- TeamCity (builds automatisés)
+- SonarQube (analyse de qualité du code)
+- YouTrack (gestion des tickets)
+- Discord (notifications)
+- GitHub (checks et branch protection)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Métriques de Qualité
+
+- **Coverage** : ≥ 80%
+- **Duplications** : ≤ 3%
+- **Maintainability Rating** : A
+- **Reliability Rating** : A
+- **Security Rating** : A
+
+## Ressources
+
+- [TeamCity Documentation](https://www.jetbrains.com/help/teamcity/)
+- [SonarQube JavaScript/TypeScript](https://docs.sonarqube.org/latest/analysis/languages/javascript/)
+- [SonarQube PHP](https://docs.sonarqube.org/latest/analysis/languages/php/)
+- [Jest Documentation](https://jestjs.io/)
+- [PHPUnit Documentation](https://phpunit.de/)

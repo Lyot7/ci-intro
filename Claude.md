@@ -1,10 +1,12 @@
 # CI/CD Configuration - ci-intro
 
 ## Vue d'ensemble
-Configuration complète d'une chaîne CI/CD pour le projet Next.js avec intégration YouTrack, TeamCity, GitHub et Discord.
+Configuration complète d'une chaîne CI/CD pour un projet multi-langages (Node.js + PHP) avec intégration YouTrack, TeamCity, GitHub et Discord. Ce projet sert d'atelier pratique pour apprendre les concepts CI/CD.
 
 ## Stack Technique
-- **Projet** : Next.js 15.5.5 + TypeScript + Tailwind CSS 4.0
+- **Projets** :
+  - **mtech-node/** : Node.js avec Jest pour les tests
+  - **mtech-php/** : PHP avec PHPUnit pour les tests
 - **CI/CD** : TeamCity
 - **Gestion de projet** : YouTrack
 - **VCS** : GitHub
@@ -16,39 +18,39 @@ Configuration complète d'une chaîne CI/CD pour le projet Next.js avec intégra
 ## 1. Configuration TeamCity
 
 ### Pipeline CI/CD
-Créer une configuration de build TeamCity avec les étapes suivantes :
+Créer une configuration de build TeamCity avec les étapes suivantes pour les deux projets :
 
-#### Build Steps
-1. **Install Dependencies**
+#### Build Steps - Projet Node.js (mtech-node)
+
+1. **Install Dependencies (Node.js)**
    ```bash
+   cd mtech-node
    npm ci
    ```
 
-2. **Lint Check**
+2. **Run Tests with Coverage (Node.js)**
    ```bash
-   npm run lint
+   cd mtech-node
+   npm test -- --coverage
    ```
 
-3. **TypeScript Check**
+#### Build Steps - Projet PHP (mtech-php)
+
+3. **Install Dependencies (PHP)**
    ```bash
-   npx tsc --noEmit
+   cd mtech-php
+   composer install --no-interaction --prefer-dist
    ```
 
-4. **Build Production**
+4. **Run Tests with Coverage (PHP)**
    ```bash
-   npm run build
+   cd mtech-php
+   ./vendor/bin/phpunit --coverage-clover coverage/clover.xml --coverage-html coverage/html
    ```
 
-5. **Run Tests** (à ajouter si nécessaire)
-   ```bash
-   npm test
-   ```
+#### Build Steps - Analyse Globale
 
-6. **SonarQube Analysis**
-   ```bash
-   npm run sonar
-   ```
-   Ou directement avec le scanner :
+5. **SonarQube Analysis**
    ```bash
    sonar-scanner \
      -Dsonar.projectKey=ci-intro \
@@ -62,7 +64,8 @@ Créer une configuration de build TeamCity avec les étapes suivantes :
 - Déclencher sur chaque Pull Request
 
 #### Artifacts
-- Build output dans `.next/`
+- Coverage reports : `mtech-node/coverage/` et `mtech-php/coverage/`
+- Test reports : résultats Jest et PHPUnit
 - Logs de build
 
 ---
@@ -93,39 +96,54 @@ Créer à la racine du projet :
 ```properties
 # Project identification
 sonar.projectKey=ci-intro
-sonar.projectName=CI Intro
+sonar.projectName=CI Intro - Multi-langages
 sonar.projectVersion=1.0.0
 
-# Source code
-sonar.sources=app,components,lib
-sonar.tests=__tests__,tests
-sonar.test.inclusions=**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx
+# Multi-module structure
+sonar.modules=mtech-node,mtech-php
 
-# Exclusions
-sonar.exclusions=**/node_modules/**,**/.next/**,**/coverage/**,**/dist/**,**/*.config.js,**/*.config.ts
+# Node.js module configuration
+mtech-node.sonar.projectName=MTech Node.js
+mtech-node.sonar.sources=app.js
+mtech-node.sonar.tests=test
+mtech-node.sonar.test.inclusions=**/*.test.js
+mtech-node.sonar.javascript.lcov.reportPaths=coverage/lcov.info
 
-# Coverage
-sonar.javascript.lcov.reportPaths=coverage/lcov.info
-sonar.typescript.lcov.reportPaths=coverage/lcov.info
+# PHP module configuration
+mtech-php.sonar.projectName=MTech PHP
+mtech-php.sonar.sources=src
+mtech-php.sonar.tests=tests
+mtech-php.sonar.test.inclusions=**/*Test.php
+mtech-php.sonar.php.coverage.reportPaths=coverage/clover.xml
 
-# TypeScript
-sonar.typescript.tsconfigPath=tsconfig.json
+# Global exclusions
+sonar.exclusions=**/node_modules/**,**/vendor/**,**/coverage/**,**/.DS_Store
 
-# Language
-sonar.language=ts
+# Encoding
 sonar.sourceEncoding=UTF-8
 ```
 
-#### Package.json Scripts
-Ajouter dans `package.json` :
+#### Configuration mtech-node/package.json
+Ajouter les scripts de test avec couverture :
 ```json
 {
   "scripts": {
+    "test": "jest",
     "test:coverage": "jest --coverage",
-    "sonar": "sonar-scanner"
+    "test:watch": "jest --watch"
   },
   "devDependencies": {
-    "sonarqube-scanner": "^3.3.0"
+    "jest": "^29.7.0"
+  }
+}
+```
+
+#### Configuration mtech-php/composer.json
+Les scripts sont déjà configurés :
+```json
+{
+  "scripts": {
+    "test": "phpunit"
   }
 }
 ```
@@ -218,9 +236,9 @@ Protections de branche requises sur `main` :
 
 #### Required Checks
 - ✅ TeamCity Build Status
-- ✅ Lint Check
-- ✅ TypeScript Compilation
-- ✅ Production Build Success
+- ✅ Node.js Tests (Jest)
+- ✅ PHP Tests (PHPUnit)
+- ✅ Code Coverage (Node.js + PHP)
 - ✅ SonarQube Quality Gate
 
 #### Branch Protection Rules
@@ -229,8 +247,8 @@ Require status checks to pass before merging: true
 Require branches to be up to date before merging: true
 Required status checks:
   - teamcity/build
-  - teamcity/lint
-  - teamcity/typescript
+  - teamcity/tests-node
+  - teamcity/tests-php
   - sonarqube/quality-gate
 ```
 
@@ -284,9 +302,10 @@ Duration: 2m 35s
 ```
 ❌ Build Échoué - ci-intro
 Branch: feature/new-feature
-Commit: def5678 - Fix login bug
+Commit: def5678 - Fix calculator bug
 Author: @developer
-Error: TypeScript compilation failed
+Error: PHPUnit tests failed (mtech-php)
+Failed test: testAdditionNegativeNumbers
 Duration: 1m 12s
 🔗 TeamCity Logs | 🔗 GitHub
 ```
@@ -382,47 +401,95 @@ env.NODE_ENV = production
 ## 7. Fichiers de Configuration à Créer
 
 ### `.teamcity/settings.kts`
-Configuration TeamCity as Code (Kotlin DSL)
+Configuration TeamCity as Code (Kotlin DSL) pour orchestrer les builds des deux projets
 
-### `sonar-project.properties`
-Configuration SonarQube avec les règles de qualité
+### `sonar-project.properties` (racine)
+Configuration SonarQube multi-module pour analyser Node.js et PHP
 
-### `.github/workflows/` (optionnel)
-GitHub Actions comme backup ou pour des checks supplémentaires
+### `mtech-node/jest.config.js`
+Configuration Jest pour générer les rapports de couverture LCOV :
+```javascript
+module.exports = {
+  testEnvironment: 'node',
+  coverageDirectory: 'coverage',
+  collectCoverageFrom: ['app.js'],
+  coverageReporters: ['text', 'lcov', 'html'],
+  testMatch: ['**/test/**/*.test.js']
+};
+```
 
-### `discord-notifier.js`
+### `mtech-php/phpunit.xml` (mise à jour)
+Ajouter la génération de rapport de couverture Clover pour SonarQube
+
+### `.gitignore` (racine)
+Exclure les dépendances et fichiers générés :
+```gitignore
+# Node.js
+mtech-node/node_modules/
+mtech-node/coverage/
+
+# PHP
+mtech-php/vendor/
+mtech-php/coverage/
+
+# IDE
+.DS_Store
+.idea/
+.vscode/
+
+# TeamCity
+.teamcity/
+
+# SonarQube
+.sonar/
+.scannerwork/
+```
+
+### `.github/pull_request_template.md`
+Template pour les Pull Requests avec liens YouTrack
+
+### `discord-notifier.js` (optionnel)
 Script Node.js pour envoyer des notifications Discord personnalisées
-
-### `jest.config.js` (pour les tests et coverage)
-Configuration Jest pour générer les rapports de couverture pour SonarQube
 
 ---
 
 ## 8. Ordre de Mise en Place
 
-1. ✅ **Projet Next.js créé** (fait)
-2. ⬜ Configurer le repository GitHub avec les branch protections
-3. ⬜ Créer le projet YouTrack et définir le workflow
-4. ⬜ Configurer SonarQube :
-   - Créer le projet dans SonarQube
+1. ✅ **Projets Node.js et PHP créés** (fait)
+   - ✅ mtech-node/ avec Jest
+   - ✅ mtech-php/ avec PHPUnit
+2. ⬜ Créer les fichiers de configuration locaux :
+   - `jest.config.js` dans mtech-node/
+   - Mise à jour de `phpunit.xml` dans mtech-php/
+   - `sonar-project.properties` à la racine
+   - `.gitignore` à la racine
+3. ⬜ Configurer le repository GitHub avec les branch protections
+4. ⬜ Créer le projet YouTrack et définir le workflow
+5. ⬜ Configurer SonarQube :
+   - Créer le projet multi-module dans SonarQube
    - Générer le token d'authentification
    - Configurer le Quality Gate
-   - Créer `sonar-project.properties`
-5. ⬜ Configurer TeamCity :
+   - Activer les analyseurs JavaScript et PHP
+6. ⬜ Configurer TeamCity :
    - Créer le projet
-   - Ajouter les build steps (incluant SonarQube)
+   - Ajouter les build steps Node.js (npm ci, npm test)
+   - Ajouter les build steps PHP (composer install, phpunit)
+   - Ajouter le step SonarQube Analysis
    - Configurer les VCS triggers
    - Ajouter le SonarQube Build Feature
-6. ⬜ Intégrer TeamCity avec GitHub (checks)
-7. ⬜ Intégrer TeamCity avec YouTrack (issue tracking)
-8. ⬜ Configurer le webhook SonarQube → TeamCity
-9. ⬜ Configurer les webhooks Discord (incluant SonarQube)
-10. ⬜ Tester le workflow complet :
-   - Créer une issue YouTrack
+7. ⬜ Intégrer TeamCity avec GitHub (checks)
+8. ⬜ Intégrer TeamCity avec YouTrack (issue tracking)
+9. ⬜ Configurer le webhook SonarQube → TeamCity
+10. ⬜ Configurer les webhooks Discord (incluant SonarQube)
+11. ⬜ Tester le workflow complet :
+   - Créer une issue YouTrack (ex: PICT-101)
    - Créer une branche
-   - Faire un commit avec référence
+   - Décommenter le test erroné (Node.js ou PHP)
+   - Faire un commit avec référence YouTrack
    - Créer une PR
-   - Vérifier tous les checks GitHub (build, lint, TypeScript, SonarQube)
+   - Vérifier l'échec du build (test failed)
+   - Corriger le test
+   - Vérifier tous les checks GitHub (tests Node.js, PHP, SonarQube)
    - Vérifier le Quality Gate SonarQube
    - Merger et vérifier toutes les notifications Discord
 

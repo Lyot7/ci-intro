@@ -1,0 +1,477 @@
+# CI/CD Configuration - ci-intro
+
+## Vue d'ensemble
+Configuration complète d'une chaîne CI/CD pour le projet Next.js avec intégration YouTrack, TeamCity, GitHub et Discord.
+
+## Stack Technique
+- **Projet** : Next.js 15.5.5 + TypeScript + Tailwind CSS 4.0
+- **CI/CD** : TeamCity
+- **Gestion de projet** : YouTrack
+- **VCS** : GitHub
+- **Qualité du code** : SonarQube
+- **Notifications** : Discord
+
+---
+
+## 1. Configuration TeamCity
+
+### Pipeline CI/CD
+Créer une configuration de build TeamCity avec les étapes suivantes :
+
+#### Build Steps
+1. **Install Dependencies**
+   ```bash
+   npm ci
+   ```
+
+2. **Lint Check**
+   ```bash
+   npm run lint
+   ```
+
+3. **TypeScript Check**
+   ```bash
+   npx tsc --noEmit
+   ```
+
+4. **Build Production**
+   ```bash
+   npm run build
+   ```
+
+5. **Run Tests** (à ajouter si nécessaire)
+   ```bash
+   npm test
+   ```
+
+6. **SonarQube Analysis**
+   ```bash
+   npm run sonar
+   ```
+   Ou directement avec le scanner :
+   ```bash
+   sonar-scanner \
+     -Dsonar.projectKey=ci-intro \
+     -Dsonar.sources=. \
+     -Dsonar.host.url=%sonar.host.url% \
+     -Dsonar.token=%sonar.token%
+   ```
+
+#### VCS Triggers
+- Déclencher sur chaque commit sur `main`
+- Déclencher sur chaque Pull Request
+
+#### Artifacts
+- Build output dans `.next/`
+- Logs de build
+
+---
+
+## 2. Analyse de Code avec SonarQube
+
+### Configuration du Projet SonarQube
+
+#### Création du Projet
+1. Se connecter à SonarQube
+2. Créer un nouveau projet : `ci-intro`
+3. Générer un token d'authentification
+4. Configurer le Quality Gate
+
+#### Quality Gate Personnalisé
+Critères de qualité à respecter :
+- **Coverage** : ≥ 80%
+- **Duplications** : ≤ 3%
+- **Maintainability Rating** : A
+- **Reliability Rating** : A
+- **Security Rating** : A
+- **Security Hotspots Reviewed** : 100%
+
+### Configuration du Projet
+
+#### sonar-project.properties
+Créer à la racine du projet :
+```properties
+# Project identification
+sonar.projectKey=ci-intro
+sonar.projectName=CI Intro
+sonar.projectVersion=1.0.0
+
+# Source code
+sonar.sources=app,components,lib
+sonar.tests=__tests__,tests
+sonar.test.inclusions=**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx
+
+# Exclusions
+sonar.exclusions=**/node_modules/**,**/.next/**,**/coverage/**,**/dist/**,**/*.config.js,**/*.config.ts
+
+# Coverage
+sonar.javascript.lcov.reportPaths=coverage/lcov.info
+sonar.typescript.lcov.reportPaths=coverage/lcov.info
+
+# TypeScript
+sonar.typescript.tsconfigPath=tsconfig.json
+
+# Language
+sonar.language=ts
+sonar.sourceEncoding=UTF-8
+```
+
+#### Package.json Scripts
+Ajouter dans `package.json` :
+```json
+{
+  "scripts": {
+    "test:coverage": "jest --coverage",
+    "sonar": "sonar-scanner"
+  },
+  "devDependencies": {
+    "sonarqube-scanner": "^3.3.0"
+  }
+}
+```
+
+### Intégration TeamCity → SonarQube
+
+#### Build Feature
+Ajouter dans TeamCity :
+```kotlin
+features {
+    sonar {
+        serverUrl = "%sonar.host.url%"
+        serverToken = "%sonar.token%"
+        projectKey = "ci-intro"
+        projectName = "CI Intro"
+        projectVersion = "%build.number%"
+    }
+}
+```
+
+### Quality Gate Status
+
+#### Gestion des Échecs
+- **Quality Gate Failed** → Bloquer le merge de la PR
+- **New Code Quality Gate** → Analyser uniquement le nouveau code
+- **Overall Code Quality Gate** → Analyser tout le code
+
+#### Webhook SonarQube → TeamCity
+Configurer un webhook dans SonarQube :
+```
+URL: https://teamcity.company.com/app/sonar/webhook
+Events: Quality Gate status changed
+```
+
+### Métriques SonarQube à Surveiller
+
+#### Code Smells
+- Complexité cyclomatique élevée
+- Fonctions trop longues
+- Code dupliqué
+- Commentaires TODO/FIXME
+
+#### Bugs
+- Erreurs potentielles
+- Null pointer exceptions
+- Type errors
+
+#### Vulnerabilities
+- Injections SQL
+- XSS vulnerabilities
+- Hardcoded credentials
+- Weak cryptography
+
+#### Security Hotspots
+- Points sensibles à vérifier manuellement
+- Utilisation de bibliothèques obsolètes
+- Configurations non sécurisées
+
+---
+
+## 3. Intégration YouTrack
+
+### Commit Message Pattern
+Format requis pour lier les commits aux issues YouTrack :
+```
+[PROJECT-123] Description du commit
+
+Détails supplémentaires si nécessaire
+```
+
+### Workflow YouTrack
+1. **Création d'issue** → État : `Open`
+2. **Début du développement** → État : `In Progress`
+3. **Commit avec référence** → Commit lié automatiquement
+4. **Pull Request créée** → État : `Code Review`
+5. **Build TeamCity réussi** → État : `Testing`
+6. **Merge dans main** → État : `Done`
+
+### Configuration TeamCity → YouTrack
+- Activer l'intégration YouTrack dans TeamCity
+- Parser les messages de commit pour extraire les IDs d'issues
+- Mettre à jour automatiquement le statut des issues
+
+---
+
+## 4. GitHub Checks
+
+### Configuration des Status Checks
+Protections de branche requises sur `main` :
+
+#### Required Checks
+- ✅ TeamCity Build Status
+- ✅ Lint Check
+- ✅ TypeScript Compilation
+- ✅ Production Build Success
+- ✅ SonarQube Quality Gate
+
+#### Branch Protection Rules
+```yaml
+Require status checks to pass before merging: true
+Require branches to be up to date before merging: true
+Required status checks:
+  - teamcity/build
+  - teamcity/lint
+  - teamcity/typescript
+  - sonarqube/quality-gate
+```
+
+#### Pull Request Template
+Créer `.github/pull_request_template.md` :
+```markdown
+## Description
+<!-- Décrivez les changements -->
+
+## YouTrack Issue
+<!-- Lien vers l'issue YouTrack -->
+Fixes: [PROJECT-XXX](https://youtrack.company.com/issue/PROJECT-XXX)
+
+## Type de changement
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Documentation update
+
+## Checklist
+- [ ] Le code compile sans erreurs
+- [ ] Les tests passent
+- [ ] La documentation est à jour
+```
+
+### TeamCity → GitHub Integration
+- Utiliser GitHub App ou Personal Access Token
+- Publier les résultats de build comme GitHub Checks
+- Bloquer le merge si TeamCity échoue
+
+---
+
+## 5. Notifications Discord
+
+### Webhooks Discord
+Créer un webhook Discord pour le canal de développement.
+
+### Notifications à Envoyer
+
+#### 1. Build Success
+```
+✅ Build Réussi - ci-intro
+Branch: main
+Commit: abc1234 - [PROJECT-123] Feature description
+Author: @developer
+Duration: 2m 35s
+🔗 TeamCity | 🔗 GitHub
+```
+
+#### 2. Build Failed
+```
+❌ Build Échoué - ci-intro
+Branch: feature/new-feature
+Commit: def5678 - Fix login bug
+Author: @developer
+Error: TypeScript compilation failed
+Duration: 1m 12s
+🔗 TeamCity Logs | 🔗 GitHub
+```
+
+#### 3. Pull Request Events
+```
+🔔 Nouvelle Pull Request
+PR #42: Add user authentication
+Author: @developer
+YouTrack: PROJECT-123
+Status: ⏳ Waiting for checks
+🔗 View PR
+```
+
+#### 4. Deployment Success
+```
+🚀 Déploiement Réussi - Production
+Version: v1.2.3
+Deployed by: TeamCity
+Time: 14:32 UTC
+🔗 Live Site
+```
+
+#### 5. SonarQube Quality Gate
+```
+📊 SonarQube Analysis - Quality Gate PASSED
+Project: ci-intro
+Coverage: 85.2% (+2.1%)
+Bugs: 0
+Vulnerabilities: 0
+Code Smells: 3 (Minor)
+Technical Debt: 15min
+Rating: A
+🔗 View Report
+```
+
+```
+⚠️ SonarQube Analysis - Quality Gate FAILED
+Project: ci-intro
+Coverage: 72.1% (Required: 80%)
+New Bugs: 2
+New Vulnerabilities: 1 (Critical)
+Code Smells: 12
+Issues to fix before merge
+🔗 View Details
+```
+
+### Configuration TeamCity → Discord
+Utiliser un Build Feature dans TeamCity :
+```kotlin
+features {
+    notifications {
+        notifierSettings = discordNotifier {
+            webhookUrl = "%discord.webhook.url%"
+            sendOnSuccess = true
+            sendOnFailure = true
+            sendOnStart = false
+        }
+    }
+}
+```
+
+---
+
+## 6. Variables d'Environnement
+
+### TeamCity Parameters
+```properties
+# GitHub
+github.token = %vault:github/token%
+github.repo = owner/ci-intro
+
+# YouTrack
+youtrack.url = https://youtrack.company.com
+youtrack.token = %vault:youtrack/token%
+youtrack.project = PROJECT
+
+# SonarQube
+sonar.host.url = https://sonarqube.company.com
+sonar.token = %vault:sonarqube/token%
+sonar.projectKey = ci-intro
+
+# Discord
+discord.webhook.url = %vault:discord/webhook%
+discord.channel.id = 123456789
+
+# Application
+env.NODE_ENV = production
+```
+
+---
+
+## 7. Fichiers de Configuration à Créer
+
+### `.teamcity/settings.kts`
+Configuration TeamCity as Code (Kotlin DSL)
+
+### `sonar-project.properties`
+Configuration SonarQube avec les règles de qualité
+
+### `.github/workflows/` (optionnel)
+GitHub Actions comme backup ou pour des checks supplémentaires
+
+### `discord-notifier.js`
+Script Node.js pour envoyer des notifications Discord personnalisées
+
+### `jest.config.js` (pour les tests et coverage)
+Configuration Jest pour générer les rapports de couverture pour SonarQube
+
+---
+
+## 8. Ordre de Mise en Place
+
+1. ✅ **Projet Next.js créé** (fait)
+2. ⬜ Configurer le repository GitHub avec les branch protections
+3. ⬜ Créer le projet YouTrack et définir le workflow
+4. ⬜ Configurer SonarQube :
+   - Créer le projet dans SonarQube
+   - Générer le token d'authentification
+   - Configurer le Quality Gate
+   - Créer `sonar-project.properties`
+5. ⬜ Configurer TeamCity :
+   - Créer le projet
+   - Ajouter les build steps (incluant SonarQube)
+   - Configurer les VCS triggers
+   - Ajouter le SonarQube Build Feature
+6. ⬜ Intégrer TeamCity avec GitHub (checks)
+7. ⬜ Intégrer TeamCity avec YouTrack (issue tracking)
+8. ⬜ Configurer le webhook SonarQube → TeamCity
+9. ⬜ Configurer les webhooks Discord (incluant SonarQube)
+10. ⬜ Tester le workflow complet :
+   - Créer une issue YouTrack
+   - Créer une branche
+   - Faire un commit avec référence
+   - Créer une PR
+   - Vérifier tous les checks GitHub (build, lint, TypeScript, SonarQube)
+   - Vérifier le Quality Gate SonarQube
+   - Merger et vérifier toutes les notifications Discord
+
+---
+
+## 9. Monitoring et Logs
+
+### Métriques à Surveiller
+- Temps de build moyen
+- Taux de succès des builds
+- Temps de déploiement
+- Fréquence des commits/PRs
+- **SonarQube Metrics** :
+  - Évolution de la couverture de code
+  - Tendance de la dette technique
+  - Nombre de bugs/vulnérabilités
+  - Taux de passage du Quality Gate
+
+### Logs à Conserver
+- Build logs (TeamCity)
+- Deployment logs
+- Error traces
+- Performance metrics
+- SonarQube analysis reports
+
+---
+
+## 10. Notes et Considérations
+
+- Utiliser des secrets/vault pour toutes les clés API (GitHub, YouTrack, SonarQube, Discord)
+- Documenter les processus pour l'équipe
+- Prévoir des rollback automatiques en cas d'échec
+- Configurer des alertes pour les builds critiques
+- Mettre en place des environments de staging/production séparés
+- **SonarQube** :
+  - Définir un Quality Gate adapté au projet
+  - Former l'équipe aux métriques de qualité
+  - Prévoir du temps pour corriger la dette technique
+  - Utiliser les Quality Profiles adaptés (TypeScript/JavaScript)
+  - Activer les règles de sécurité (OWASP)
+
+---
+
+## 11. Ressources Utiles
+
+- [TeamCity Documentation](https://www.jetbrains.com/help/teamcity/)
+- [YouTrack Integration](https://www.jetbrains.com/help/youtrack/integrations-overview.html)
+- [GitHub Status Checks API](https://docs.github.com/en/rest/checks)
+- [Discord Webhooks Guide](https://discord.com/developers/docs/resources/webhook)
+- [SonarQube Documentation](https://docs.sonarqube.org/latest/)
+- [SonarQube JavaScript/TypeScript Analysis](https://docs.sonarqube.org/latest/analysis/languages/javascript/)
+- [TeamCity SonarQube Integration](https://www.jetbrains.com/help/teamcity/sonarqube.html)

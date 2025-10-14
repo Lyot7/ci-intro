@@ -17,6 +17,6 @@ final class CalculatorTest extends TestCase
     // Test volontairement erroné pour l'activité "Erreur et correction"
     public function testAdditionNegativeNumbers(): void
     {
-        $this->assertSame(-4, Calculator::add(-2, -3)); // échouera (résultat attendu: -5)
+       // $this->assertSame(-4, Calculator::add(-2, -3)); // échouera (résultat attendu: -5)
     }*/
 }

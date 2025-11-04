@@ -241,6 +241,9 @@ jobs:
       github.ref == 'refs/heads/main' &&
       contains(github.event.head_commit.message, '#deploy')
 
+    permissions:
+      contents: write  # Required to create and push tags
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

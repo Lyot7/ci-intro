@@ -11,7 +11,7 @@ const {
 // Tests Addition
 describe('Addition', () => {
   test('addition de 2 + 3 = 5', () => {
-    throw new Error('test');
+  
     expect(addition(2, 3)).toBe(5);
   });
 

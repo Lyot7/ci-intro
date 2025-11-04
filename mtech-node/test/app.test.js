@@ -10,8 +10,8 @@ const {
 
 // Tests Addition
 describe('Addition', () => {
-  test('addition de 2 + 3 = 5', () => {
-    expect(addition(2, 3)).toBe(5);
+  test('addition de 2 + 3 = 6', () => {
+    expect(addition(2, 3)).toBe(6);
   });
 
   test('addition de nombres négatifs', () => {

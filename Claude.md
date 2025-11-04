@@ -48,7 +48,7 @@ Le workflow `.github/workflows/ci.yml` contient les jobs suivants :
 1. **Checkout code** : Récupération du code source
 2. **Set up Docker Buildx** : Configuration de Docker pour le build multi-plateforme
 3. **Log in to Scaleway** : Connexion au registre Scaleway avec credentials stockés dans GitHub Secrets
-4. **Build and push** : Construction de l'image Docker et push vers `rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambraa:latest`
+4. **Build and push** : Construction de l'image Docker et push vers `rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambaraa:latest`
 5. **Deployment summary** : Affichage d'un résumé du déploiement
 
 ### Triggers
@@ -92,7 +92,7 @@ Exclusions pour optimiser la taille de l'image :
 
 **Namespace** : `mds-m2-dfs` (région Paris)
 
-**Image** : `bouquerel-leroy-lambraa:latest`
+**Image** : `bouquerel-leroy-lambaraa:latest`
 
 ### Authentification
 
@@ -121,8 +121,8 @@ docker run --rm -it mtech-node:local sh
 
 # Pull depuis Scaleway (après déploiement)
 docker login rg.fr-par.scw.cloud/mds-m2-dfs -u nologin -p <SECRET_KEY>
-docker pull rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambraa:latest
-docker run --rm rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambraa:latest
+docker pull rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambaraa:latest
+docker run --rm rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambaraa:latest
 ```
 
 ---
@@ -169,7 +169,7 @@ Pour déclencher un déploiement Docker :
    - ✅ Construire l'image Docker
    - ✅ Se connecter à Scaleway
    - ✅ Pusher l'image vers le registre
-4. L'image est disponible à : `rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambraa:latest`
+4. L'image est disponible à : `rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambaraa:latest`
 
 ---
 

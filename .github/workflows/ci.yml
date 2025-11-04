@@ -37,54 +37,57 @@ jobs:
           path: mtech-node/coverage/
           retention-days: 7
 
-  test-php:
-    name: PHP Tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@bf6b4fbd49ca58e4608c9c89fba0b8d90bd2a39f  # v2.35.5
-        with:
-          php-version: '8.2'
-          coverage: xdebug
-          tools: composer
-
-      - name: Install dependencies
-        working-directory: ./mtech-php
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Run tests with coverage
-        working-directory: ./mtech-php
-        run: ./vendor/bin/phpunit --coverage-clover coverage/clover.xml --coverage-html coverage/html
-
-      - name: Upload PHP coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: php-coverage
-          path: mtech-php/coverage/
-          retention-days: 7
-
   build-status:
     name: Build Status Check
     runs-on: ubuntu-latest
-    needs: [test-node, test-php]
+    needs: [test-node]
     if: always()
 
     steps:
       - name: Check build status
         run: |
-          if [ "${{ needs.test-node.result }}" == "success" ] && \
-             [ "${{ needs.test-php.result }}" == "success" ]; then
+          if [ "${{ needs.test-node.result }}" == "success" ]; then
             echo "✅ All tests passed successfully!"
             exit 0
           else
-            echo "❌ Some tests failed:"
+            echo "❌ Tests failed:"
             echo "  - Node.js tests: ${{ needs.test-node.result }}"
-            echo "  - PHP tests: ${{ needs.test-php.result }}"
             exit 1
           fi
+
+  deploy:
+    name: Deploy to Scaleway Container Registry
+    runs-on: ubuntu-latest
+    needs: [test-node, build-status]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      contains(github.event.head_commit.message, '#deploy')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Scaleway Container Registry
+        run: |
+          echo "${{ secrets.SCW_SECRET_KEY }}" | docker login rg.fr-par.scw.cloud/mds-m2-dfs \
+            --username nologin \
+            --password-stdin
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./mtech-node
+          file: ./mtech-node/Dockerfile
+          push: true
+          tags: rg.fr-par.scw.cloud/mds-m2-dfs/mtech-node:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deployment summary
+        run: |
+          echo "🚀 Docker image successfully deployed to Scaleway Container Registry!"
+          echo "📦 Image: rg.fr-par.scw.cloud/mds-m2-dfs/mtech-node:latest"
+          echo "🔗 Registry: rg.fr-par.scw.cloud/mds-m2-dfs"

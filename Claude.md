@@ -1,413 +1,206 @@
 # CI/CD Configuration - ci-intro
 
 ## Vue d'ensemble
-Configuration complète d'une chaîne CI/CD pour un projet multi-langages (Node.js + PHP) avec intégration YouTrack, TeamCity, GitHub et Discord. Ce projet sert d'atelier pratique pour apprendre les concepts CI/CD.
+Configuration d'une chaîne CI/CD pour un projet Node.js avec déploiement Docker sur Scaleway Container Registry. Ce projet sert d'atelier pratique pour apprendre les concepts CI/CD.
 
 ## Stack Technique
-- **Projets** :
-  - **mtech-node/** : Node.js avec Jest pour les tests
-  - **mtech-php/** : PHP avec PHPUnit pour les tests
-- **CI/CD** : TeamCity
-- **Gestion de projet** : YouTrack
+- **Projet** : **mtech-node/** - Node.js avec Jest pour les tests
+- **CI/CD** : GitHub Actions
 - **VCS** : GitHub
-- **Qualité du code** : SonarQube
-- **Notifications** : Discord
+- **Conteneurisation** : Docker
+- **Registry** : Scaleway Container Registry
+- **Qualité du code** : SonarQube (optionnel - à configurer)
+- **Gestion de projet** : YouTrack (optionnel - à configurer)
 
 ---
 
-## 1. Configuration TeamCity
+## 1. Configuration GitHub Actions
 
 ### Pipeline CI/CD
-Créer une configuration de build TeamCity avec les étapes suivantes pour les deux projets :
+Le workflow `.github/workflows/ci.yml` contient les jobs suivants :
 
-#### Build Steps - Projet Node.js (mtech-node)
+#### Job 1: test-node
+**Tests unitaires avec couverture de code**
 
-1. **Install Dependencies (Node.js)**
+Étapes :
+1. **Checkout code** : Récupération du code source
+2. **Setup Node.js** : Installation de Node.js v20 avec cache npm
+3. **Install dependencies** : `npm ci` dans mtech-node/
+4. **Run tests with coverage** : `npm run test:coverage`
+5. **Upload coverage** : Upload des rapports de couverture comme artifacts (7 jours de rétention)
+
+#### Job 2: build-status
+**Vérification du statut global du build**
+
+- Dépend de : `test-node`
+- S'exécute toujours (`if: always()`)
+- Affiche un résumé du statut des tests
+
+#### Job 3: deploy
+**Déploiement Docker vers Scaleway Container Registry**
+
+**Conditions de déclenchement** :
+- Branche : `main` uniquement
+- Commit message contient : `#deploy`
+- Tests réussis
+
+**Étapes** :
+1. **Checkout code** : Récupération du code source
+2. **Set up Docker Buildx** : Configuration de Docker pour le build multi-plateforme
+3. **Log in to Scaleway** : Connexion au registre Scaleway avec credentials stockés dans GitHub Secrets
+4. **Build and push** : Construction de l'image Docker et push vers `rg.fr-par.scw.cloud/mds-m2-dfs/mtech-node:latest`
+5. **Deployment summary** : Affichage d'un résumé du déploiement
+
+### Triggers
+- **Push** : Sur toutes les branches
+- **Pull Request** : Sur toutes les PRs
+- **Deploy** : Uniquement sur `main` avec commit contenant `#deploy`
+
+---
+
+## 2. Configuration Docker
+
+### Dockerfile (mtech-node/Dockerfile)
+
+**Image de base** : `node:20-alpine` (légère et sécurisée)
+
+**Architecture** :
+1. Copie des fichiers `package*.json`
+2. Installation des dépendances de production : `npm ci --only=production`
+3. Copie du code source (app.js, test/, jest.config.js)
+4. Installation de toutes les dépendances (dev inclus) : `npm ci`
+5. Création d'un utilisateur non-root `nodejs` (UID 1001)
+6. Switch vers l'utilisateur `nodejs`
+7. **CMD par défaut** : `npm test`
+
+### .dockerignore (mtech-node/.dockerignore)
+
+Exclusions pour optimiser la taille de l'image :
+- `node_modules/` : Réinstallés dans le container
+- `coverage/` : Fichiers générés localement
+- `.git/`, `.github/` : Non nécessaires dans l'image
+- Fichiers IDE (`.vscode/`, `.idea/`)
+- Documentation (`*.md`)
+
+---
+
+## 3. Scaleway Container Registry
+
+### Configuration
+
+**Endpoint** : `rg.fr-par.scw.cloud/mds-m2-dfs`
+
+**Namespace** : `mds-m2-dfs` (région Paris)
+
+**Image** : `mtech-node:latest`
+
+### Authentification
+
+Les credentials Scaleway doivent être configurés dans les **GitHub Secrets** :
+
+1. Aller dans `Settings` → `Secrets and variables` → `Actions`
+2. Ajouter les secrets suivants :
+   - **Name** : `SCW_SECRET_KEY`
+   - **Value** : La clé secrète Scaleway
+
+**Note** : Le login Scaleway utilise toujours le username `nologin` avec la clé secrète comme password.
+
+### Commandes Docker Utiles
+
+**Tester l'image localement** :
+```bash
+# Build de l'image
+cd mtech-node
+docker build -t mtech-node:local .
+
+# Exécuter les tests (CMD par défaut)
+docker run --rm mtech-node:local
+
+# Shell interactif dans le container
+docker run --rm -it mtech-node:local sh
+
+# Pull depuis Scaleway (après déploiement)
+docker login rg.fr-par.scw.cloud/mds-m2-dfs -u nologin -p <SECRET_KEY>
+docker pull rg.fr-par.scw.cloud/mds-m2-dfs/mtech-node:latest
+docker run --rm rg.fr-par.scw.cloud/mds-m2-dfs/mtech-node:latest
+```
+
+---
+
+## 4. Workflow de Développement
+
+### Développement Standard
+
+1. **Créer une branche** :
+   ```bash
+   git checkout -b feature/ma-nouvelle-fonctionnalite
+   ```
+
+2. **Développer et tester localement** :
    ```bash
    cd mtech-node
-   npm ci
+   npm test
+   npm run test:coverage
    ```
 
-2. **Run Tests with Coverage (Node.js)**
+3. **Commit et push** :
    ```bash
-   cd mtech-node
-   npm test -- --coverage
+   git add .
+   git commit -m "Ajout de la nouvelle fonctionnalité"
+   git push origin feature/ma-nouvelle-fonctionnalite
    ```
 
-#### Build Steps - Projet PHP (mtech-php)
+4. **Créer une Pull Request** sur GitHub
+5. Les tests s'exécutent automatiquement via GitHub Actions
+6. **Merge** après revue et tests réussis
 
-3. **Install Dependencies (PHP)**
+### Workflow de Déploiement
+
+Pour déclencher un déploiement Docker :
+
+1. **S'assurer que les tests passent** sur `main`
+2. **Créer un commit avec `#deploy`** dans le message :
    ```bash
-   cd mtech-php
-   composer install --no-interaction --prefer-dist
+   git commit -m "Release v1.2.0 #deploy"
+   git push origin main
    ```
-
-4. **Run Tests with Coverage (PHP)**
-   ```bash
-   cd mtech-php
-   ./vendor/bin/phpunit --coverage-clover coverage/clover.xml --coverage-html coverage/html
-   ```
-
-#### Build Steps - Analyse Globale
-
-5. **SonarQube Analysis**
-   ```bash
-   sonar-scanner \
-     -Dsonar.projectKey=ci-intro \
-     -Dsonar.sources=. \
-     -Dsonar.host.url=%sonar.host.url% \
-     -Dsonar.token=%sonar.token%
-   ```
-
-#### VCS Triggers
-- Déclencher sur chaque commit sur `main`
-- Déclencher sur chaque Pull Request
-
-#### Artifacts
-- Coverage reports : `mtech-node/coverage/` et `mtech-php/coverage/`
-- Test reports : résultats Jest et PHPUnit
-- Logs de build
+3. GitHub Actions va :
+   - ✅ Exécuter les tests
+   - ✅ Construire l'image Docker
+   - ✅ Se connecter à Scaleway
+   - ✅ Pusher l'image vers le registre
+4. L'image est disponible à : `rg.fr-par.scw.cloud/mds-m2-dfs/mtech-node:latest`
 
 ---
 
-## 2. Analyse de Code avec SonarQube
-
-### Configuration du Projet SonarQube
-
-#### Création du Projet
-1. Se connecter à SonarQube
-2. Créer un nouveau projet : `ci-intro`
-3. Générer un token d'authentification
-4. Configurer le Quality Gate
-
-#### Quality Gate Personnalisé
-Critères de qualité à respecter :
-- **Coverage** : ≥ 80%
-- **Duplications** : ≤ 3%
-- **Maintainability Rating** : A
-- **Reliability Rating** : A
-- **Security Rating** : A
-- **Security Hotspots Reviewed** : 100%
-
-### Configuration du Projet
-
-#### sonar-project.properties
-Créer à la racine du projet :
-```properties
-# Project identification
-sonar.projectKey=ci-intro
-sonar.projectName=CI Intro - Multi-langages
-sonar.projectVersion=1.0.0
-
-# Multi-module structure
-sonar.modules=mtech-node,mtech-php
-
-# Node.js module configuration
-mtech-node.sonar.projectName=MTech Node.js
-mtech-node.sonar.sources=app.js
-mtech-node.sonar.tests=test
-mtech-node.sonar.test.inclusions=**/*.test.js
-mtech-node.sonar.javascript.lcov.reportPaths=coverage/lcov.info
-
-# PHP module configuration
-mtech-php.sonar.projectName=MTech PHP
-mtech-php.sonar.sources=src
-mtech-php.sonar.tests=tests
-mtech-php.sonar.test.inclusions=**/*Test.php
-mtech-php.sonar.php.coverage.reportPaths=coverage/clover.xml
-
-# Global exclusions
-sonar.exclusions=**/node_modules/**,**/vendor/**,**/coverage/**,**/.DS_Store
-
-# Encoding
-sonar.sourceEncoding=UTF-8
-```
-
-#### Configuration mtech-node/package.json
-Ajouter les scripts de test avec couverture :
-```json
-{
-  "scripts": {
-    "test": "jest",
-    "test:coverage": "jest --coverage",
-    "test:watch": "jest --watch"
-  },
-  "devDependencies": {
-    "jest": "^29.7.0"
-  }
-}
-```
-
-#### Configuration mtech-php/composer.json
-Les scripts sont déjà configurés :
-```json
-{
-  "scripts": {
-    "test": "phpunit"
-  }
-}
-```
-
-### Intégration TeamCity → SonarQube
-
-#### Build Feature
-Ajouter dans TeamCity :
-```kotlin
-features {
-    sonar {
-        serverUrl = "%sonar.host.url%"
-        serverToken = "%sonar.token%"
-        projectKey = "ci-intro"
-        projectName = "CI Intro"
-        projectVersion = "%build.number%"
-    }
-}
-```
-
-### Quality Gate Status
-
-#### Gestion des Échecs
-- **Quality Gate Failed** → Bloquer le merge de la PR
-- **New Code Quality Gate** → Analyser uniquement le nouveau code
-- **Overall Code Quality Gate** → Analyser tout le code
-
-#### Webhook SonarQube → TeamCity
-Configurer un webhook dans SonarQube :
-```
-URL: https://teamcity.company.com/app/sonar/webhook
-Events: Quality Gate status changed
-```
-
-### Métriques SonarQube à Surveiller
-
-#### Code Smells
-- Complexité cyclomatique élevée
-- Fonctions trop longues
-- Code dupliqué
-- Commentaires TODO/FIXME
-
-#### Bugs
-- Erreurs potentielles
-- Null pointer exceptions
-- Type errors
-
-#### Vulnerabilities
-- Injections SQL
-- XSS vulnerabilities
-- Hardcoded credentials
-- Weak cryptography
-
-#### Security Hotspots
-- Points sensibles à vérifier manuellement
-- Utilisation de bibliothèques obsolètes
-- Configurations non sécurisées
-
----
-
-## 3. Intégration YouTrack
-
-### Commit Message Pattern
-Format requis pour lier les commits aux issues YouTrack :
-```
-[PROJECT-123] Description du commit
-
-Détails supplémentaires si nécessaire
-```
-
-### Workflow YouTrack
-1. **Création d'issue** → État : `Open`
-2. **Début du développement** → État : `In Progress`
-3. **Commit avec référence** → Commit lié automatiquement
-4. **Pull Request créée** → État : `Code Review`
-5. **Build TeamCity réussi** → État : `Testing`
-6. **Merge dans main** → État : `Done`
-
-### Configuration TeamCity → YouTrack
-- Activer l'intégration YouTrack dans TeamCity
-- Parser les messages de commit pour extraire les IDs d'issues
-- Mettre à jour automatiquement le statut des issues
-
----
-
-## 4. GitHub Checks
-
-### Configuration des Status Checks
-Protections de branche requises sur `main` :
-
-#### Required Checks
-- ✅ TeamCity Build Status
-- ✅ Node.js Tests (Jest)
-- ✅ PHP Tests (PHPUnit)
-- ✅ Code Coverage (Node.js + PHP)
-- ✅ SonarQube Quality Gate
-
-#### Branch Protection Rules
-```yaml
-Require status checks to pass before merging: true
-Require branches to be up to date before merging: true
-Required status checks:
-  - teamcity/build
-  - teamcity/tests-node
-  - teamcity/tests-php
-  - sonarqube/quality-gate
-```
-
-#### Pull Request Template
-Créer `.github/pull_request_template.md` :
-```markdown
-## Description
-<!-- Décrivez les changements -->
-
-## YouTrack Issue
-<!-- Lien vers l'issue YouTrack -->
-Fixes: [PROJECT-XXX](https://youtrack.company.com/issue/PROJECT-XXX)
-
-## Type de changement
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Breaking change
-- [ ] Documentation update
-
-## Checklist
-- [ ] Le code compile sans erreurs
-- [ ] Les tests passent
-- [ ] La documentation est à jour
-```
-
-### TeamCity → GitHub Integration
-- Utiliser GitHub App ou Personal Access Token
-- Publier les résultats de build comme GitHub Checks
-- Bloquer le merge si TeamCity échoue
-
----
-
-## 5. Notifications Discord
-
-### Webhooks Discord
-Créer un webhook Discord pour le canal de développement.
-
-### Notifications à Envoyer
-
-#### 1. Build Success
-```
-✅ Build Réussi - ci-intro
-Branch: main
-Commit: abc1234 - [PROJECT-123] Feature description
-Author: @developer
-Duration: 2m 35s
-🔗 TeamCity | 🔗 GitHub
-```
-
-#### 2. Build Failed
-```
-❌ Build Échoué - ci-intro
-Branch: feature/new-feature
-Commit: def5678 - Fix calculator bug
-Author: @developer
-Error: PHPUnit tests failed (mtech-php)
-Failed test: testAdditionNegativeNumbers
-Duration: 1m 12s
-🔗 TeamCity Logs | 🔗 GitHub
-```
-
-#### 3. Pull Request Events
-```
-🔔 Nouvelle Pull Request
-PR #42: Add user authentication
-Author: @developer
-YouTrack: PROJECT-123
-Status: ⏳ Waiting for checks
-🔗 View PR
-```
-
-#### 4. Deployment Success
-```
-🚀 Déploiement Réussi - Production
-Version: v1.2.3
-Deployed by: TeamCity
-Time: 14:32 UTC
-🔗 Live Site
-```
-
-#### 5. SonarQube Quality Gate
-```
-📊 SonarQube Analysis - Quality Gate PASSED
-Project: ci-intro
-Coverage: 85.2% (+2.1%)
-Bugs: 0
-Vulnerabilities: 0
-Code Smells: 3 (Minor)
-Technical Debt: 15min
-Rating: A
-🔗 View Report
-```
+## 5. Structure du Projet
 
 ```
-⚠️ SonarQube Analysis - Quality Gate FAILED
-Project: ci-intro
-Coverage: 72.1% (Required: 80%)
-New Bugs: 2
-New Vulnerabilities: 1 (Critical)
-Code Smells: 12
-Issues to fix before merge
-🔗 View Details
-```
-
-### Configuration TeamCity → Discord
-Utiliser un Build Feature dans TeamCity :
-```kotlin
-features {
-    notifications {
-        notifierSettings = discordNotifier {
-            webhookUrl = "%discord.webhook.url%"
-            sendOnSuccess = true
-            sendOnFailure = true
-            sendOnStart = false
-        }
-    }
-}
+ci-intro/
+├── .github/
+│   └── workflows/
+│       └── ci.yml              # Workflow GitHub Actions (tests + deploy)
+├── mtech-node/                 # Application Node.js
+│   ├── app.js                  # Code source (fonctions de calcul)
+│   ├── test/                   # Tests Jest
+│   ├── package.json            # Dépendances npm
+│   ├── package-lock.json       # Lock file npm
+│   ├── jest.config.js          # Configuration Jest
+│   ├── Dockerfile              # Définition de l'image Docker
+│   ├── .dockerignore           # Exclusions Docker
+│   ├── coverage/               # Rapports de couverture (généré)
+│   └── node_modules/           # Dépendances (généré)
+├── CLAUDE.md                   # Ce fichier - Documentation CI/CD
+├── README.md                   # Documentation du projet
+└── .gitignore                  # Exclusions Git
 ```
 
 ---
 
-## 6. Variables d'Environnement
+## 6. Tests et Couverture de Code
 
-### TeamCity Parameters
-```properties
-# GitHub
-github.token = %vault:github/token%
-github.repo = owner/ci-intro
+### Configuration Jest (mtech-node/jest.config.js)
 
-# YouTrack
-youtrack.url = https://youtrack.company.com
-youtrack.token = %vault:youtrack/token%
-youtrack.project = PROJECT
-
-# SonarQube
-sonar.host.url = https://sonarqube.company.com
-sonar.token = %vault:sonarqube/token%
-sonar.projectKey = ci-intro
-
-# Discord
-discord.webhook.url = %vault:discord/webhook%
-discord.channel.id = 123456789
-
-# Application
-env.NODE_ENV = production
-```
-
----
-
-## 7. Fichiers de Configuration à Créer
-
-### `.teamcity/settings.kts`
-Configuration TeamCity as Code (Kotlin DSL) pour orchestrer les builds des deux projets
-
-### `sonar-project.properties` (racine)
-Configuration SonarQube multi-module pour analyser Node.js et PHP
-
-### `mtech-node/jest.config.js`
-Configuration Jest pour générer les rapports de couverture LCOV :
 ```javascript
 module.exports = {
   testEnvironment: 'node',
@@ -418,127 +211,247 @@ module.exports = {
 };
 ```
 
-### `mtech-php/phpunit.xml` (mise à jour)
-Ajouter la génération de rapport de couverture Clover pour SonarQube
+### Scripts npm (mtech-node/package.json)
 
-### `.gitignore` (racine)
-Exclure les dépendances et fichiers générés :
-```gitignore
-# Node.js
-mtech-node/node_modules/
-mtech-node/coverage/
-
-# PHP
-mtech-php/vendor/
-mtech-php/coverage/
-
-# IDE
-.DS_Store
-.idea/
-.vscode/
-
-# TeamCity
-.teamcity/
-
-# SonarQube
-.sonar/
-.scannerwork/
+```json
+{
+  "scripts": {
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch"
+  }
+}
 ```
 
-### `.github/pull_request_template.md`
-Template pour les Pull Requests avec liens YouTrack
+### Commandes
 
-### `discord-notifier.js` (optionnel)
-Script Node.js pour envoyer des notifications Discord personnalisées
+```bash
+cd mtech-node
 
----
+# Exécuter les tests
+npm test
 
-## 8. Ordre de Mise en Place
+# Tests avec couverture
+npm run test:coverage
 
-1. ✅ **Projets Node.js et PHP créés** (fait)
-   - ✅ mtech-node/ avec Jest
-   - ✅ mtech-php/ avec PHPUnit
-2. ⬜ Créer les fichiers de configuration locaux :
-   - `jest.config.js` dans mtech-node/
-   - Mise à jour de `phpunit.xml` dans mtech-php/
-   - `sonar-project.properties` à la racine
-   - `.gitignore` à la racine
-3. ⬜ Configurer le repository GitHub avec les branch protections
-4. ⬜ Créer le projet YouTrack et définir le workflow
-5. ⬜ Configurer SonarQube :
-   - Créer le projet multi-module dans SonarQube
-   - Générer le token d'authentification
-   - Configurer le Quality Gate
-   - Activer les analyseurs JavaScript et PHP
-6. ⬜ Configurer TeamCity :
-   - Créer le projet
-   - Ajouter les build steps Node.js (npm ci, npm test)
-   - Ajouter les build steps PHP (composer install, phpunit)
-   - Ajouter le step SonarQube Analysis
-   - Configurer les VCS triggers
-   - Ajouter le SonarQube Build Feature
-7. ⬜ Intégrer TeamCity avec GitHub (checks)
-8. ⬜ Intégrer TeamCity avec YouTrack (issue tracking)
-9. ⬜ Configurer le webhook SonarQube → TeamCity
-10. ⬜ Configurer les webhooks Discord (incluant SonarQube)
-11. ⬜ Tester le workflow complet :
-   - Créer une issue YouTrack (ex: PICT-101)
-   - Créer une branche
-   - Décommenter le test erroné (Node.js ou PHP)
-   - Faire un commit avec référence YouTrack
-   - Créer une PR
-   - Vérifier l'échec du build (test failed)
-   - Corriger le test
-   - Vérifier tous les checks GitHub (tests Node.js, PHP, SonarQube)
-   - Vérifier le Quality Gate SonarQube
-   - Merger et vérifier toutes les notifications Discord
+# Tests en mode watch (développement)
+npm run test:watch
+```
 
 ---
 
-## 9. Monitoring et Logs
+## 7. Intégration SonarQube (Optionnel)
+
+### Configuration du Projet
+
+Pour activer l'analyse SonarQube, créer `sonar-project.properties` à la racine :
+
+```properties
+# Project identification
+sonar.projectKey=ci-intro
+sonar.projectName=CI Intro - Node.js
+sonar.projectVersion=1.0.0
+
+# Source configuration
+sonar.sources=mtech-node/app.js
+sonar.tests=mtech-node/test
+sonar.test.inclusions=**/*.test.js
+
+# Coverage report
+sonar.javascript.lcov.reportPaths=mtech-node/coverage/lcov.info
+
+# Exclusions
+sonar.exclusions=**/node_modules/**,**/coverage/**,**/.DS_Store
+
+# Encoding
+sonar.sourceEncoding=UTF-8
+```
+
+### Intégration GitHub Actions
+
+Ajouter un job SonarQube dans `.github/workflows/ci.yml` :
+
+```yaml
+sonarqube:
+  name: SonarQube Analysis
+  runs-on: ubuntu-latest
+  needs: [test-node]
+
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: SonarQube Scan
+      uses: sonarsource/sonarqube-scan-action@master
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+```
+
+**Secrets à configurer** :
+- `SONAR_TOKEN` : Token d'authentification SonarQube
+- `SONAR_HOST_URL` : URL du serveur SonarQube
+
+---
+
+## 8. Intégration YouTrack (Optionnel)
+
+### Format des Commits
+
+Pour lier automatiquement les commits aux issues YouTrack :
+
+```
+[PROJECT-123] Description du commit
+
+Détails supplémentaires si nécessaire
+```
+
+### Workflow YouTrack Suggéré
+
+1. **Création d'issue** → État : `Open`
+2. **Début du développement** → État : `In Progress`
+3. **Commit avec référence** → Commit lié automatiquement à l'issue
+4. **Pull Request créée** → État : `Code Review`
+5. **Tests GitHub Actions réussis** → État : `Testing`
+6. **Merge dans main** → État : `Done`
+
+---
+
+## 9. Branch Protection Rules
+
+### Recommandations pour la branche `main`
+
+Dans GitHub : `Settings` → `Branches` → `Add rule`
+
+**Configuration suggérée** :
+- ✅ **Require a pull request before merging**
+  - Require approvals: 1
+- ✅ **Require status checks to pass before merging**
+  - Status checks: `test-node`, `build-status`
+- ✅ **Require branches to be up to date before merging**
+- ✅ **Do not allow bypassing the above settings**
+
+---
+
+## 10. Variables d'Environnement et Secrets
+
+### GitHub Secrets Requis
+
+| Secret Name       | Description                              | Exemple                             |
+|------------------|------------------------------------------|-------------------------------------|
+| `SCW_SECRET_KEY` | Clé secrète Scaleway Container Registry  | `804838a0-5492-46fa-8037-...`      |
+
+### GitHub Secrets Optionnels (selon extensions)
+
+| Secret Name        | Description                    | Utilisation          |
+|-------------------|--------------------------------|----------------------|
+| `SONAR_TOKEN`     | Token SonarQube                | Analyse de code      |
+| `SONAR_HOST_URL`  | URL du serveur SonarQube       | Analyse de code      |
+| `DISCORD_WEBHOOK` | Webhook Discord                | Notifications        |
+
+---
+
+## 11. Monitoring et Métriques
 
 ### Métriques à Surveiller
+
+**GitHub Actions** :
 - Temps de build moyen
 - Taux de succès des builds
-- Temps de déploiement
 - Fréquence des commits/PRs
-- **SonarQube Metrics** :
-  - Évolution de la couverture de code
-  - Tendance de la dette technique
-  - Nombre de bugs/vulnérabilités
-  - Taux de passage du Quality Gate
+- Temps d'exécution des tests
+
+**Docker** :
+- Taille de l'image
+- Temps de build de l'image
+- Nombre de layers
+- Fréquence des déploiements
+
+**SonarQube** (si configuré) :
+- Couverture de code (≥ 80% recommandé)
+- Dette technique
+- Bugs et vulnérabilités
+- Code smells
 
 ### Logs à Conserver
-- Build logs (TeamCity)
+
+- Build logs (GitHub Actions)
 - Deployment logs
-- Error traces
-- Performance metrics
-- SonarQube analysis reports
+- Test results
+- Coverage reports (artifacts 7 jours)
 
 ---
 
-## 10. Notes et Considérations
+## 12. Troubleshooting
 
-- Utiliser des secrets/vault pour toutes les clés API (GitHub, YouTrack, SonarQube, Discord)
-- Documenter les processus pour l'équipe
-- Prévoir des rollback automatiques en cas d'échec
-- Configurer des alertes pour les builds critiques
-- Mettre en place des environments de staging/production séparés
-- **SonarQube** :
-  - Définir un Quality Gate adapté au projet
-  - Former l'équipe aux métriques de qualité
-  - Prévoir du temps pour corriger la dette technique
-  - Utiliser les Quality Profiles adaptés (TypeScript/JavaScript)
-  - Activer les règles de sécurité (OWASP)
+### Les tests échouent sur GitHub Actions mais passent localement
+
+**Causes possibles** :
+- Versions Node.js différentes
+- Dépendances manquantes dans `package-lock.json`
+- Variables d'environnement manquantes
+
+**Solutions** :
+```bash
+# Nettoyer et réinstaller
+rm -rf node_modules package-lock.json
+npm install
+npm test
+
+# Vérifier la version Node.js
+node --version  # Doit être v20
+```
+
+### Le déploiement Docker ne se déclenche pas
+
+**Vérifications** :
+1. Le commit est-il sur la branche `main` ?
+2. Le message contient-il `#deploy` ?
+3. Les tests sont-ils passés ?
+4. Le secret `SCW_SECRET_KEY` est-il configuré dans GitHub ?
+
+**Debug** :
+- Consulter les logs GitHub Actions (onglet "Actions")
+- Vérifier la condition `if:` du job `deploy`
+
+### Erreur de connexion au registre Scaleway
+
+**Erreur** : `denied: access forbidden`
+
+**Solutions** :
+1. Vérifier que le secret `SCW_SECRET_KEY` est correct
+2. Vérifier que la clé Scaleway a les permissions nécessaires
+3. Vérifier que le namespace `mds-m2-dfs` existe
 
 ---
 
-## 11. Ressources Utiles
+## 13. Améliorations Futures
 
-- [TeamCity Documentation](https://www.jetbrains.com/help/teamcity/)
-- [YouTrack Integration](https://www.jetbrains.com/help/youtrack/integrations-overview.html)
-- [GitHub Status Checks API](https://docs.github.com/en/rest/checks)
-- [Discord Webhooks Guide](https://discord.com/developers/docs/resources/webhook)
+### Court terme
+- [ ] Ajouter des badges de build dans le README
+- [ ] Configurer des notifications Discord
+- [ ] Ajouter un versioning sémantique (git tags)
+
+### Moyen terme
+- [ ] Intégrer SonarQube pour l'analyse de code
+- [ ] Mettre en place un environnement de staging
+- [ ] Ajouter des tests d'intégration
+
+### Long terme
+- [ ] Déploiement automatique sur un orchestrateur (Kubernetes, Docker Swarm)
+- [ ] Monitoring avec Prometheus + Grafana
+- [ ] Alertes automatiques sur échec de build
+
+---
+
+## 14. Ressources Utiles
+
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
+- [Docker Documentation](https://docs.docker.com/)
+- [Scaleway Container Registry](https://www.scaleway.com/en/docs/containers/container-registry/)
+- [Jest Documentation](https://jestjs.io/docs/getting-started)
+- [Node.js Best Practices](https://github.com/goldbergyoni/nodebestpractices)
 - [SonarQube Documentation](https://docs.sonarqube.org/latest/)
-- [SonarQube JavaScript/TypeScript Analysis](https://docs.sonarqube.org/latest/analysis/languages/javascript/)
-- [TeamCity SonarQube Integration](https://www.jetbrains.com/help/teamcity/sonarqube.html)
+- [GitHub Status Checks API](https://docs.github.com/en/rest/checks)

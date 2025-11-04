@@ -294,7 +294,6 @@ jobs:
           file: ./mtech-node/Dockerfile
           push: true
           tags: |
-            rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambaraa:latest
             rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambaraa:${{ steps.version.outputs.version }}
             rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambaraa:${{ steps.version.outputs.version_sha }}
           cache-from: type=gha
@@ -305,7 +304,6 @@ jobs:
           echo "🚀 Docker image successfully deployed to Scaleway Container Registry!"
           echo ""
           echo "📦 Images pushed:"
-          echo "  - rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambaraa:latest"
           echo "  - rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambaraa:${{ steps.version.outputs.version }}"
           echo "  - rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambaraa:${{ steps.version.outputs.version_sha }}"
           echo ""
@@ -352,7 +350,7 @@ jobs:
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "*Image Tags:*\n• latest\n• ${{ steps.version.outputs.version }}\n• ${{ steps.version.outputs.version_sha }}"
+                      "text": "*Image Tags:*\n• ${{ steps.version.outputs.version }}\n• ${{ steps.version.outputs.version_sha }}"
                     },
                     {
                       "type": "mrkdwn",

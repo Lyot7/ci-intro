@@ -43,6 +43,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
+          webhook-type: incoming-webhook
           payload: |
             {
               "text": "${{ job.status == 'success' && '✅' || '❌' }} Node.js Tests ${{ job.status }}",
@@ -110,6 +111,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
+          webhook-type: incoming-webhook
           payload: |
             {
               "text": "${{ needs.test-node.result == 'success' && '✅' || '❌' }} Build Status: ${{ needs.test-node.result }}",
@@ -201,6 +203,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
+          webhook-type: incoming-webhook
           payload: |
             {
               "text": "${{ job.status == 'success' && '🚀' || '❌' }} Deployment ${{ job.status }}",

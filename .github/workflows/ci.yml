@@ -82,12 +82,12 @@ jobs:
           context: ./mtech-node
           file: ./mtech-node/Dockerfile
           push: true
-          tags: rg.fr-par.scw.cloud/mds-m2-dfs/mtech-node:latest
+          tags: rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambraa:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Deployment summary
         run: |
           echo "🚀 Docker image successfully deployed to Scaleway Container Registry!"
-          echo "📦 Image: rg.fr-par.scw.cloud/mds-m2-dfs/mtech-node:latest"
+          echo "📦 Image: rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambraa:latest"
           echo "🔗 Registry: rg.fr-par.scw.cloud/mds-m2-dfs"

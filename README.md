@@ -27,6 +27,8 @@ Ce projet démontre une chaîne CI/CD complète :
 
 ## Structure du Projet
 
+
+
 ```
 ci-intro/
 ├── .github/

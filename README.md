@@ -1,6 +1,6 @@
 # CI/CD Introduction - Projet Node.js avec Docker
 
-[![CI Status](https://github.com/YOUR_USERNAME/ci-intro/workflows/CI%20-%20Tests%20&%20Build/badge.svg)](https://github.com/YOUR_USERNAME/ci-intro/actions)
+[![CI Status](https://github.com/Lyot7/ci-intro/workflows/CI%20-%20Tests%20&%20Build/badge.svg)](https://github.com/Lyot7/ci-intro/actions)
 
 Projet d'atelier pratique pour apprendre les concepts de CI/CD avec GitHub Actions, Docker et Scaleway Container Registry.
 
@@ -52,7 +52,7 @@ ci-intro/
 
 ```bash
 # Cloner le repository
-git clone https://github.com/YOUR_USERNAME/ci-intro.git
+git clone https://github.com/Lyot7/ci-intro.git
 cd ci-intro
 
 # Installer les dépendances
@@ -287,5 +287,3 @@ Consultez **CLAUDE.md** pour :
 Ce projet est à but éducatif dans le cadre d'un atelier CI/CD.
 
 ---
-
-**Note** : Remplacez `YOUR_USERNAME` par votre nom d'utilisateur GitHub dans les URLs.

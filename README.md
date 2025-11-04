@@ -8,6 +8,8 @@ Projet d'atelier pratique pour apprendre les concepts de CI/CD avec GitHub Actio
 
 Ce projet démontre une chaîne CI/CD complète :
 - **Tests automatisés** avec Jest et couverture de code
+- **Analyse de code** avec SonarCloud Quality Gate
+- **Notifications** Slack à chaque étape du pipeline
 - **Build Docker** automatisé
 - **Déploiement** sur Scaleway Container Registry
 - **Intégration continue** via GitHub Actions
@@ -17,6 +19,8 @@ Ce projet démontre une chaîne CI/CD complète :
 - **Langage** : Node.js 20
 - **Tests** : Jest
 - **CI/CD** : GitHub Actions
+- **Analyse de code** : SonarCloud
+- **Notifications** : Slack
 - **Conteneurisation** : Docker
 - **Registry** : Scaleway Container Registry
 - **VCS** : GitHub
@@ -118,21 +122,34 @@ git push origin main
 
 **Résultat** : GitHub Actions :
 1. Exécute les tests
-2. Construit l'image Docker
-3. Se connecte à Scaleway
-4. Push l'image : `rg.fr-par.scw.cloud/mds-m2-dfs/mtech-node:latest`
+2. Vérifie le statut du build
+3. Analyse le code avec SonarCloud Quality Gate (sur `main` uniquement)
+4. Construit l'image Docker
+5. Se connecte à Scaleway
+6. Push l'image : `rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambaraa:latest`
+7. Envoie des notifications Slack à chaque étape
 
-## Configuration Scaleway
+## Configuration Secrets GitHub
 
-### Secrets GitHub Requis
+### Secrets Requis
 
-Pour que le déploiement fonctionne, configurez le secret suivant dans GitHub :
+Pour que le pipeline fonctionne, configurez les secrets suivants dans GitHub :
 
 1. Aller dans **Settings** → **Secrets and variables** → **Actions**
 2. Cliquer sur **New repository secret**
-3. Créer le secret :
+3. Créer les secrets :
+
+   **Pour le déploiement Scaleway** :
    - **Name** : `SCW_SECRET_KEY`
    - **Value** : Votre clé secrète Scaleway
+
+   **Pour l'analyse SonarCloud** :
+   - **Name** : `SONAR_TOKEN`
+   - **Value** : Votre token SonarCloud
+
+   **Pour les notifications Slack** :
+   - **Name** : `SLACK_WEBHOOK_URL`
+   - **Value** : Votre URL de webhook Slack
 
 ### Tester le Déploiement
 
@@ -143,32 +160,48 @@ Après le déploiement, vous pouvez pull l'image depuis Scaleway :
 docker login rg.fr-par.scw.cloud/mds-m2-dfs -u nologin -p YOUR_SECRET_KEY
 
 # Pull de l'image
-docker pull rg.fr-par.scw.cloud/mds-m2-dfs/mtech-node:latest
+docker pull rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambaraa:latest
 
 # Exécuter l'image
-docker run --rm rg.fr-par.scw.cloud/mds-m2-dfs/mtech-node:latest
+docker run --rm rg.fr-par.scw.cloud/mds-m2-dfs/bouquerel-leroy-lambaraa:latest
 ```
 
 ## Pipeline GitHub Actions
 
 ### Jobs
 
-1. **test-node** : Exécute les tests Jest avec couverture
-2. **build-status** : Vérifie le statut global du build
-3. **deploy** : Déploie vers Scaleway (uniquement si `#deploy` sur `main`)
+1. **test-node** : Exécute les tests Jest avec couverture + notification Slack
+2. **build-status** : Vérifie le statut global du build + notification Slack
+3. **sonarqube** : Analyse de code avec SonarCloud Quality Gate (uniquement sur `main`) + notification Slack
+4. **deploy** : Déploie vers Scaleway (uniquement si `#deploy` sur `main`) + notification Slack
 
-### Conditions de Déploiement
+### Déclencheurs
 
-Le job `deploy` s'exécute uniquement si :
+- **push** : S'exécute sur tous les push de toutes les branches
+- **pull_request** : S'exécute sur toutes les pull requests
+
+### Conditions Spéciales
+
+**Job `sonarqube`** :
+- ✅ Branche = `main` uniquement
+- ✅ Tests réussis
+- ⚡ Télécharge les rapports de couverture
+- 🔍 Vérifie la Quality Gate SonarCloud
+
+**Job `deploy`** :
 - ✅ Branche = `main`
 - ✅ Commit message contient `#deploy`
 - ✅ Tests réussis
+- ✅ Build status OK
+- ✅ Quality Gate SonarCloud passée
 
 ## Métriques de Qualité
 
-- **Test Coverage** : Rapports automatiques uploadés comme artifacts
+- **Test Coverage** : Rapports automatiques uploadés comme artifacts (7 jours de rétention)
+- **SonarCloud Quality Gate** : Analyse automatique de la qualité du code sur `main`
+- **Notifications Slack** : Notifications en temps réel pour chaque job (tests, build, SonarCloud, déploiement)
 - **Build Time** : Visible dans les logs GitHub Actions
-- **Docker Image Size** : Optimisée avec Alpine Linux
+- **Docker Image Size** : Optimisée avec Alpine Linux et cache GitHub Actions
 
 ## Activité Pratique : Erreur et Correction
 
@@ -218,19 +251,42 @@ Simuler un bug et observer le pipeline CI/CD.
 
 7. **Observer le build réussir** ✅
 
-## Intégrations Optionnelles
+## Intégrations Actives
 
-### SonarQube
-Pour activer l'analyse de code avec SonarQube, consultez la section 7 de `CLAUDE.md`.
+### SonarCloud ✅
+L'analyse de code SonarCloud est **active** et s'exécute automatiquement sur la branche `main`.
+- 🔍 Quality Gate automatique
+- 📊 Rapports de couverture de code
+- 🛡️ Détection des bugs et vulnérabilités
+- 📈 Analyse de la dette technique
 
-### YouTrack
+**Configuration** :
+- **Project Key** : `Lyot7_ci-intro`
+- **Organization** : `lyot7`
+- **Host** : `https://sonarcloud.io`
+- **Coverage** : Utilise les rapports LCOV générés par Jest
+
+### Notifications Slack ✅
+Les notifications Slack sont **actives** pour tous les jobs :
+- ✅ Succès/échec des tests
+- ✅ Statut du build
+- ✅ Résultat SonarCloud Quality Gate
+- ✅ Déploiements réussis ou échoués
+
+**Informations dans les notifications** :
+- Repository et branche
+- Auteur du commit
+- Message du commit
+- Liens directs vers le workflow et le commit
+- Statut visuel (✅ succès, ❌ échec, 🚀 déploiement)
+
+### Intégrations Optionnelles
+
+#### YouTrack
 Pour lier les commits aux issues YouTrack, utilisez le format :
 ```
 [PROJECT-123] Description du commit
 ```
-
-### Notifications Discord
-Configurez un webhook Discord pour recevoir des notifications de build. Voir section 5 de `CLAUDE.md`.
 
 ## Troubleshooting
 
@@ -253,9 +309,27 @@ npm test
 1. Le commit est sur `main` ?
 2. Le message contient `#deploy` ?
 3. Les tests sont passés ?
-4. Le secret `SCW_SECRET_KEY` est configuré ?
+4. La Quality Gate SonarCloud a réussi ?
+5. Les secrets `SCW_SECRET_KEY`, `SONAR_TOKEN` et `SLACK_WEBHOOK_URL` sont configurés ?
 
 **Debug** : Consulter les logs dans l'onglet **Actions** de GitHub.
+
+### SonarCloud Quality Gate échoue
+
+**Causes possibles** :
+- Couverture de code insuffisante
+- Bugs détectés dans le code
+- Code smells ou dette technique
+- Vulnérabilités de sécurité
+
+**Solution** : Consultez le rapport SonarCloud pour identifier et corriger les problèmes.
+
+### Les notifications Slack ne fonctionnent pas
+
+**Vérifications** :
+1. Le secret `SLACK_WEBHOOK_URL` est correctement configuré ?
+2. Le webhook Slack est actif dans votre workspace ?
+3. Les permissions du webhook sont correctes ?
 
 ## Documentation Complète
 
@@ -263,8 +337,11 @@ Consultez **CLAUDE.md** pour :
 - Configuration détaillée de GitHub Actions
 - Architecture Docker
 - Guide complet Scaleway
-- Intégrations avancées (SonarQube, YouTrack, Discord)
+- Configuration SonarCloud avancée
+- Intégrations Slack et YouTrack
 - Troubleshooting approfondi
+- Variables d'environnement et secrets
+- Monitoring et métriques
 
 ## Ressources
 
@@ -272,6 +349,8 @@ Consultez **CLAUDE.md** pour :
 - [Docker Documentation](https://docs.docker.com/)
 - [Scaleway Container Registry](https://www.scaleway.com/en/docs/containers/container-registry/)
 - [Jest Documentation](https://jestjs.io/)
+- [SonarCloud Documentation](https://docs.sonarcloud.io/)
+- [Slack Incoming Webhooks](https://api.slack.com/messaging/webhooks)
 - [Node.js Best Practices](https://github.com/goldbergyoni/nodebestpractices)
 
 ## Contribution
